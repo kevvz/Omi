@@ -16,6 +16,9 @@
 #include "speaker.h"
 #include "button.h"
 #include "sdcard.h"
+#include "speaker.h"
+#include "button.h"
+#include "sdcard.h"
 #include <zephyr/drivers/sensor.h>
 
 LOG_MODULE_REGISTER(transport, CONFIG_LOG_DEFAULT_LEVEL);
@@ -30,6 +33,9 @@ uint16_t current_package_index = 0;
 //
 // Internal
 //
+
+
+static ssize_t audio_data_write_handler(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf, uint16_t len, uint16_t offset, uint8_t flags);
 
 
 static ssize_t audio_data_write_handler(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf, uint16_t len, uint16_t offset, uint8_t flags);
@@ -61,6 +67,11 @@ static struct bt_gatt_attr audio_service_attr[] = {
     BT_GATT_CHARACTERISTIC(&audio_characteristic_data_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_data_read_characteristic, NULL, NULL),
     BT_GATT_CCC(audio_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_format_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_codec_read_characteristic, NULL, NULL),
+#ifdef CONFIG_ENABLE_SPEAKER
+     BT_GATT_CHARACTERISTIC(&audio_characteristic_speaker_uuid.uuid, BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_WRITE, NULL, audio_data_write_handler, NULL),
+     BT_GATT_CCC(audio_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE), //
+#endif
+    
 #ifdef CONFIG_ENABLE_SPEAKER
      BT_GATT_CHARACTERISTIC(&audio_characteristic_speaker_uuid.uuid, BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_WRITE, NULL, audio_data_write_handler, NULL),
      BT_GATT_CCC(audio_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE), //
@@ -558,6 +569,34 @@ static bool use_storage = true;
 #define MAX_AUDIO_FILE_SIZE 300000
 
 
+#define OPUS_PREFIX_LENGTH 1
+#define OPUS_PADDED_LENGTH 100
+static uint32_t offset = 0;
+
+bool write_to_storage(void) {
+    if (!read_from_tx_queue())
+    {
+        return false;
+    }
+
+    uint8_t *buffer = tx_buffer+3;
+    uint32_t packet_size = tx_buffer_size;
+    
+    memset(storage_temp_data, 0, OPUS_PADDED_LENGTH);
+    memcpy(storage_temp_data + OPUS_PREFIX_LENGTH, buffer, packet_size);
+    storage_temp_data[0] = (uint8_t)tx_buffer_size;
+    uint8_t *write_ptr = (uint8_t*)storage_temp_data;
+    write_to_file(write_ptr,OPUS_PADDED_LENGTH);
+
+    offset=offset+packet_size;
+    return true;
+}
+
+static bool use_storage = true;
+#define MAX_FILES 10
+#define MAX_AUDIO_FILE_SIZE 300000
+
+
 
 void pusher(void)
 {
@@ -673,16 +712,6 @@ int transport_start()
 
      button_init();
      register_button_service();
-#endif
-
-#ifdef CONFIG_ENABLE_SPEAKER
-
-err = speaker_init();
-if(!err) {
-    LOG_ERR("Speaker failed to start");
-    return 0;
-}
-    
 #endif
     // Start advertising
     
