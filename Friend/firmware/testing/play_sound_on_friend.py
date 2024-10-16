@@ -17,8 +17,8 @@ remaining_bytes = 0
 remaining_bytes_b = bytearray()
 packet_size = 400
 total_offset = 0
-device_id = "3CE1CE0A-A629-2E92-D708-E49E71045D07" #Please enter the id of your device (that is, the device id used to connect to your BT device here)
-deepgram_api_id="f2e9ebf2f223ae423c88bf601ce1a157699d3005" #enter your deepgram id here
+device_id = "B55851D7-E3C0-3572-FA6C-F198AD11D390" #Please enter the id of your device (that is, the device id used to connect to your BT device here)
+deepgram_api_id="d1d9d3a7565adf14c09c2f7225554087672b2d3d" #enter your deepgram id here
 audio_write_characteristic_uuid = "19B10003-E8F2-537E-4F6C-D104768A1214" #dont change this
 MAX_ALLOWED_SAMPLES = 50000
 
